@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Zoey's Reaction Time Test</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      display: grid; min-height: 100vh; place-items: center;
+      background: #111; color: #fff;
+    }
+    .card {
+      width: min(720px, 94vw);
+      border-radius: 16px;
+      padding: 18px;
+      background: rgba(255,255,255,0.06);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    h1 { margin: 0 0 6px; font-size: 1.35rem; }
+    p { margin: 8px 0; line-height: 1.35; opacity: 0.95; }
+    .muted { opacity: 0.8; font-size: 0.95rem; }
+
+    .row { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; margin: 12px 0; }
+    @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
+
+    label { display: grid; gap: 6px; font-size: 0.95rem; }
+    select, input {
+      font-size: 1rem; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(0,0,0,0.25); color: #fff;
+      outline: none;
+    }
+
+    button {
+      width: 100%;
+      font-size: 1.05rem;
+      padding: 14px 14px;
+      border-radius: 12px;
+      border: 0;
+      cursor: pointer;
+      background: #2f7cff;
+      color: #fff;
+      font-weight: 700;
+      margin-top: 10px;
+    }
+    button.secondary { background: rgba(255,255,255,0.12); }
+    button.danger { background: rgba(255,80,80,0.22); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .bigArea {
+      margin-top: 12px;
+      border-radius: 14px;
+      height: 220px;
+      display: grid;
+      place-items: center;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+      background: rgba(255,255,255,0.08);
+      border: 2px solid rgba(255,255,255,0.08);
+      font-size: 1.1rem;
+      text-align: center;
+      padding: 10px;
+    }
+    .green { background: #11a84a !important; border-color: rgba(255,255,255,0.18) !important; }
+    .red { background: #b12121 !important; border-color: rgba(255,255,255,0.18) !important; }
+
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+    @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+
+    .small { font-size: 0.92rem; opacity: 0.85; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+    th, td { padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,0.12); font-size: 0.95rem; vertical-align: top; }
+    th { text-align: left; opacity: 0.9; }
+    .pill {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      background: rgba(255,255,255,0.14);
+      font-size: 0.85rem;
+    }
+
+    .copyRow { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-top: 10px; }
+    .tinyBtn { padding: 10px 12px; border-radius: 10px; font-size: 0.95rem; font-weight: 800; width: auto; }
+    .hint { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.10); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Zoey’s Reaction Time Test</h1>
+    <p class="muted">Tap <b>Start</b>. Wait. When it turns <b>GREEN</b>, tap as fast as you can.</p>
+
+    <div class="row">
+      <label>
+        Group
+        <select id="groupSel">
+          <option value="gamer">Gamer</option>
+          <option value="non-gamer">Non-gamer</option>
+        </select>
+      </label>
+
+      <label>
+        Trials (recommended 5)
+        <select id="trialsSel">
+          <option>3</option>
+          <option selected>5</option>
+          <option>7</option>
+          <option>10</option>
+        </select>
+      </label>
+    </div>
+
+    <button id="startBtn">Start</button>
+
+    <div id="area" class="bigArea" role="button" aria-label="tap area">
+      Ready.
+    </div>
+
+    <div class="grid2">
+      <button class="secondary" id="nextPlayerBtn" disabled>Next Player</button>
+      <button class="secondary" id="resetBtn">Reset Current Test</button>
+    </div>
+
+    <div class="hint small">
+      <b>Manual data collection:</b> After each player finishes, their summary is added below as a new row.
+      When everyone is done, tap <b>Copy All Results</b> and paste into Google Sheets/Excel.
+    </div>
+
+    <div id="status" class="small" style="margin-top:10px;"></div>
+
+    <div style="margin-top:16px;">
+      <h2 style="margin:0; font-size:1.05rem;">Class Results</h2>
+
+      <div class="copyRow">
+        <input id="csvBox" readonly value="No saved results yet." />
+        <button class="tinyBtn secondary" id="copyBtn" disabled>Copy All Results</button>
+      </div>
+
+      <div class="grid2">
+        <button class="secondary" id="downloadBtn" disabled>Download CSV</button>
+        <button class="danger" id="clearAllBtn">Clear All Results</button>
+      </div>
+
+      <div id="resultsTable"></div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const STORAGE_KEY = "zoey_reaction_time_results_v1";
+
+  const groupSel = document.getElementById('groupSel');
+  const trialsSel = document.getElementById('trialsSel');
+
+  const startBtn = document.getElementById('startBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const nextPlayerBtn = document.getElementById('nextPlayerBtn');
+
+  const area = document.getElementById('area');
+  const statusEl = document.getElementById('status');
+
+  const csvBox = document.getElementById('csvBox');
+  const copyBtn = document.getElementById('copyBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const clearAllBtn = document.getElementById('clearAllBtn');
+
+  const resultsTable = document.getElementById('resultsTable');
+
+  let state = 'idle'; // idle | waiting | go | tooSoon | done
+  let timer = null;
+  let goTime = 0;
+  let trial = 0;
+  let totalTrials = 5;
+  let samples = [];
+
+  function setAreaText(text) { area.textContent = text; }
+  function setAreaClass(cls) {
+    area.classList.remove('green', 'red');
+    if (cls) area.classList.add(cls);
+  }
+  function nowMs() { return performance.now(); }
+  function randomDelayMs() { return 1500 + Math.random() * 2500; }
+
+  function loadAll() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    } catch { return []; }
+  }
+  function saveAll(arr) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+  }
+
+  function computeSummary() {
+    const times = samples.map(s => s.ms);
+    const avg = Math.round(times.reduce((a,b)=>a+b,0)/times.length);
+    const min = Math.min(...times);
+    const max = Math.max(...times);
+    return {
+      timestamp_iso: new Date().toISOString(),
+      group: groupSel.value,
+      trials: times.length,
+      avg_ms: avg,
+      min_ms: min,
+      max_ms: max,
+      all_times_ms: times.join(","),
+      user_agent: navigator.userAgent.replaceAll('\n',' ').slice(0,180)
+    };
+  }
+
+  function toCSV(all) {
+    const header = ["timestamp_iso","group","trials","avg_ms","min_ms","max_ms","all_times_ms","user_agent"];
+    const lines = [header.join(",")];
+
+    for (const row of all) {
+      const vals = header.map(k => row[k] ?? "");
+      const escaped = vals.map(v => `"${String(v).replaceAll('"','""')}"`);
+      lines.push(escaped.join(","));
+    }
+    return lines.join("\n");
+  }
+
+  function renderTable(all) {
+    if (!all.length) {
+      resultsTable.innerHTML = `<p class="small muted">No saved results yet. Run a test and finish it to add a row.</p>`;
+      csvBox.value = "No saved results yet.";
+      copyBtn.disabled = true;
+      downloadBtn.disabled = true;
+      return;
+    }
+
+    const csv = toCSV(all);
+    csvBox.value = csv;
+    copyBtn.disabled = false;
+    downloadBtn.disabled = false;
+
+    let html = `<table>
+      <thead><tr>
+        <th>#</th>
+        <th>Group</th>
+        <th>Avg (ms)</th>
+        <th>Min</th>
+        <th>Max</th>
+        <th>Trials</th>
+        <th>Times</th>
+      </tr></thead><tbody>`;
+
+    all.forEach((r, i) => {
+      html += `<tr>
+        <td>${i+1}</td>
+        <td><span class="pill">${r.group}</span></td>
+        <td><b>${r.avg_ms}</b></td>
+        <td>${r.min_ms}</td>
+        <td>${r.max_ms}</td>
+        <td>${r.trials}</td>
+        <td style="word-break:break-word;">${r.all_times_ms}</td>
+      </tr>`;
+    });
+
+    html += `</tbody></table>`;
+    resultsTable.innerHTML = html;
+  }
+
+  function resetCurrentTest() {
+    clearTimeout(timer);
+    state = 'idle';
+    trial = 0;
+    samples = [];
+    totalTrials = parseInt(trialsSel.value, 10);
+    setAreaClass(null);
+    setAreaText('Ready.');
+    statusEl.textContent = '';
+    startBtn.disabled = false;
+    startBtn.textContent = 'Start';
+    nextPlayerBtn.disabled = true;
+  }
+
+  function startTrial() {
+    clearTimeout(timer);
+    setAreaClass(null);
+    state = 'waiting';
+    setAreaText(`Wait... (trial ${trial+1} of ${totalTrials})`);
+    statusEl.textContent = '';
+    timer = setTimeout(() => {
+      state = 'go';
+      setAreaClass('green');
+      setAreaText('TAP!');
+      goTime = nowMs();
+
+      timer = setTimeout(() => {
+        if (state === 'go') {
+          state = 'waiting';
+          setAreaClass('red');
+          setAreaText('Too slow 😅 Tap Start to try again.');
+          statusEl.textContent = 'No tap detected in time. Restart the test.';
+          startBtn.disabled = false;
+          startBtn.textContent = 'Start';
+          nextPlayerBtn.disabled = true;
+        }
+      }, 2500);
+    }, randomDelayMs());
+  }
+
+  function startTest() {
+    resetCurrentTest();
+    totalTrials = parseInt(trialsSel.value, 10);
+    startBtn.disabled = true;
+    startBtn.textContent = 'Running…';
+    startTrial();
+  }
+
+  function finishTest() {
+    state = 'done';
+    setAreaClass(null);
+    setAreaText('Done! ✅');
+    startBtn.disabled = false;
+    startBtn.textContent = 'Start (New Player)';
+    nextPlayerBtn.disabled = false;
+
+    const summary = computeSummary();
+
+    const all = loadAll();
+    all.push(summary);
+    saveAll(all);
+    renderTable(all);
+
+    statusEl.textContent = `Saved: ${summary.group} | Avg ${summary.avg_ms} ms (row ${all.length}).`;
+  }
+
+  function handleTap() {
+    if (state === 'idle') return;
+
+    if (state === 'waiting') {
+      clearTimeout(timer);
+      state = 'tooSoon';
+      setAreaClass('red');
+      setAreaText('Too soon! 😬 Tap Start to try again.');
+      statusEl.textContent = 'You tapped before it turned green. Tap Start to retry.';
+      startBtn.disabled = false;
+      startBtn.textContent = 'Start';
+      nextPlayerBtn.disabled = true;
+      return;
+    }
+
+    if (state === 'go') {
+      const rt = Math.round(nowMs() - goTime);
+      samples.push({ ms: rt });
+      trial++;
+
+      clearTimeout(timer);
+      setAreaClass(null);
+      setAreaText(`Nice! ${rt} ms`);
+      statusEl.textContent = `Recorded: ${rt} ms`;
+
+      if (trial >= totalTrials) {
+        setTimeout(finishTest, 350);
+      } else {
+        setTimeout(startTrial, 650);
+      }
+    }
+  }
+
+  // Copy CSV
+  async function copyCSV() {
+    const all = loadAll();
+    if (!all.length) return;
+    const csv = toCSV(all);
+    try {
+      await navigator.clipboard.writeText(csv);
+      copyBtn.textContent = "Copied!";
+      setTimeout(() => copyBtn.textContent = "Copy All Results", 900);
+    } catch {
+      csvBox.select();
+      document.execCommand('copy');
+    }
+  }
+
+  // Download CSV
+  function downloadCSV() {
+    const all = loadAll();
+    if (!all.length) return;
+    const csv = toCSV(all);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "zoeys_reaction_time_results.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  // Clear all
+  function clearAll() {
+    if (!confirm("Clear ALL saved results on this device?")) return;
+    saveAll([]);
+    renderTable([]);
+  }
+
+  // Events
+  startBtn.addEventListener('click', startTest);
+  resetBtn.addEventListener('click', resetCurrentTest);
+  nextPlayerBtn.addEventListener('click', resetCurrentTest);
+
+  area.addEventListener('click', handleTap);
+  area.addEventListener('touchstart', (e) => { e.preventDefault(); handleTap(); }, { passive: false });
+
+  copyBtn.addEventListener('click', copyCSV);
+  downloadBtn.addEventListener('click', downloadCSV);
+  clearAllBtn.addEventListener('click', clearAll);
+
+  // Initialize
+  resetCurrentTest();
+  renderTable(loadAll());
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Reaction Time Test</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      display: grid; min-height: 100vh; place-items: center;
+      background: #111; color: #fff;
+    }
+    .card {
+      width: min(520px, 92vw);
+      border-radius: 16px;
+      padding: 18px;
+      background: rgba(255,255,255,0.06);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    h1 { margin: 0 0 8px; font-size: 1.25rem; }
+    p { margin: 8px 0; line-height: 1.35; opacity: 0.95; }
+    .row { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; margin: 12px 0; }
+    label { display: grid; gap: 6px; font-size: 0.95rem; }
+    select, input {
+      font-size: 1rem; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(0,0,0,0.25); color: #fff;
+      outline: none;
+    }
+    button {
+      width: 100%;
+      font-size: 1.05rem;
+      padding: 14px 14px;
+      border-radius: 12px;
+      border: 0;
+      cursor: pointer;
+      background: #2f7cff;
+      color: #fff;
+      font-weight: 700;
+      margin-top: 10px;
+    }
+    button.secondary { background: rgba(255,255,255,0.12); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .bigArea {
+      margin-top: 12px;
+      border-radius: 14px;
+      height: 220px;
+      display: grid;
+      place-items: center;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+      background: rgba(255,255,255,0.08);
+      border: 2px solid rgba(255,255,255,0.08);
+      font-size: 1.1rem;
+      text-align: center;
+      padding: 10px;
+    }
+    .green { background: #11a84a !important; border-color: rgba(255,255,255,0.18) !important; }
+    .red { background: #b12121 !important; border-color: rgba(255,255,255,0.18) !important; }
+    .muted { opacity: 0.8; font-size: 0.95rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+    th, td { padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,0.12); font-size: 0.95rem; }
+    th { text-align: left; opacity: 0.9; }
+    .pill {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      background: rgba(255,255,255,0.14);
+      font-size: 0.85rem;
+    }
+    .footer { margin-top: 10px; display: grid; gap: 10px; }
+    .small { font-size: 0.9rem; opacity: 0.85; }
+    .copyRow { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+    .copyRow input { width: 100%; }
+    .tinyBtn { padding: 10px 12px; border-radius: 10px; font-size: 0.95rem; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Reaction Time Test</h1>
+    <p class="muted">Tap <b>Start</b>. Wait. When it turns <b>GREEN</b>, tap as fast as you can.</p>
+
+    <div class="row">
+      <label>
+        Gamer?
+        <select id="gamer">
+          <option value="gamer">Gamer</option>
+          <option value="non-gamer">Non-gamer</option>
+        </select>
+      </label>
+      <label>
+        Age group (optional)
+        <select id="age">
+          <option value="">—</option>
+          <option value="under-10">Under 10</option>
+          <option value="10-12">10–12</option>
+          <option value="13-17">13–17</option>
+          <option value="18+">18+</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="row">
+      <label>
+        Session code (optional)
+        <input id="session" placeholder="e.g., sciencefair-01" maxlength="30"/>
+      </label>
+      <label>
+        Trials (recommended 5)
+        <select id="trials">
+          <option>3</option>
+          <option selected>5</option>
+          <option>7</option>
+          <option>10</option>
+        </select>
+      </label>
+    </div>
+
+    <button id="startBtn">Start</button>
+
+    <div id="area" class="bigArea" role="button" aria-label="tap area">
+      Ready.
+    </div>
+
+    <div class="footer">
+      <div id="status" class="small"></div>
+
+      <div class="copyRow">
+        <input id="exportBox" readonly value="No results yet." />
+        <button class="tinyBtn secondary" id="copyBtn" disabled>Copy</button>
+      </div>
+
+      <button class="secondary" id="resetBtn">Reset</button>
+
+      <p class="small">
+        Tip: Use the same phone model for everyone if you can (different phones can have slightly different touch latency).
+      </p>
+    </div>
+
+    <div id="results"></div>
+  </div>
+
+<script>
+(() => {
+  const startBtn = document.getElementById('startBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const copyBtn = document.getElementById('copyBtn');
+  const exportBox = document.getElementById('exportBox');
+  const area = document.getElementById('area');
+  const status = document.getElementById('status');
+  const resultsDiv = document.getElementById('results');
+
+  const gamerSel = document.getElementById('gamer');
+  const ageSel = document.getElementById('age');
+  const sessionInput = document.getElementById('session');
+  const trialsSel = document.getElementById('trials');
+
+  // Allow session to be set via URL ?s=code
+  const params = new URLSearchParams(location.search);
+  if (params.get('s')) sessionInput.value = params.get('s').slice(0,30);
+
+  let state = 'idle'; // idle | waiting | go | tooSoon | done
+  let timer = null;
+  let goTime = 0;
+  let trial = 0;
+  let totalTrials = 5;
+  let samples = [];
+
+  function setAreaText(text) {
+    area.textContent = text;
+  }
+  function setAreaClass(cls) {
+    area.classList.remove('green', 'red');
+    if (cls) area.classList.add(cls);
+  }
+  function nowMs() { return performance.now(); }
+
+  function randomDelayMs() {
+    // 1.5s to 4.0s random delay
+    return 1500 + Math.random() * 2500;
+  }
+
+  function resetAll() {
+    clearTimeout(timer);
+    state = 'idle';
+    trial = 0;
+    samples = [];
+    totalTrials = parseInt(trialsSel.value, 10);
+    setAreaClass(null);
+    setAreaText('Ready.');
+    status.textContent = '';
+    startBtn.disabled = false;
+    startBtn.textContent = 'Start';
+    exportBox.value = 'No results yet.';
+    copyBtn.disabled = true;
+    resultsDiv.innerHTML = '';
+  }
+
+  function renderResults() {
+    if (!samples.length) return;
+
+    const times = samples.map(s => s.ms);
+    const avg = Math.round(times.reduce((a,b)=>a+b,0)/times.length);
+    const min = Math.min(...times);
+    const max = Math.max(...times);
+
+    const gamer = gamerSel.value;
+    const age = ageSel.value || 'NA';
+    const session = sessionInput.value.trim() || 'NA';
+    const device = navigator.userAgent.replaceAll('\n',' ').slice(0,120);
+
+    // CSV row per trial
+    const header = ['session','group','age','trial','ms','timestamp_iso','user_agent'];
+    const rows = samples.map((s, i) => ([
+      session, gamer, age, (i+1), s.ms,
+      new Date(s.when).toISOString(),
+      device
+    ]));
+
+    const csv = [header.join(','), ...rows.map(r => r.map(v => `"${String(v).replaceAll('"','""')}"`).join(','))].join('\n');
+    exportBox.value = csv;
+    copyBtn.disabled = false;
+
+    // Display table
+    let html = `<table>
+      <thead><tr>
+        <th>Trial</th><th>Time (ms)</th><th>Group</th><th>Session</th>
+      </tr></thead><tbody>`;
+    samples.forEach((s, i) => {
+      html += `<tr>
+        <td>${i+1}</td>
+        <td><span class="pill">${s.ms}</span></td>
+        <td>${gamer}</td>
+        <td>${session}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>
+      <p class="small">Avg: <b>${avg} ms</b> | Min: ${min} | Max: ${max}</p>`;
+    resultsDiv.innerHTML = html;
+  }
+
+  function startTrial() {
+    clearTimeout(timer);
+    setAreaClass(null);
+    state = 'waiting';
+    setAreaText(`Wait... (trial ${trial+1} of ${totalTrials})`);
+    status.textContent = '';
+    const delay = randomDelayMs();
+    timer = setTimeout(() => {
+      state = 'go';
+      setAreaClass('green');
+      setAreaText('TAP!');
+      goTime = nowMs();
+      // If they don't tap within 2.5s, end trial as missed (optional)
+      timer = setTimeout(() => {
+        if (state === 'go') {
+          state = 'waiting';
+          setAreaClass('red');
+          setAreaText('Too slow 😅 Tap Start to try again.');
+          status.textContent = 'No tap detected in time. Restart the test.';
+          startBtn.disabled = false;
+        }
+      }, 2500);
+    }, delay);
+  }
+
+  function startTest() {
+    resetAll();
+    totalTrials = parseInt(trialsSel.value, 10);
+    startBtn.disabled = true;
+    startBtn.textContent = 'Running…';
+    trial = 0;
+    startTrial();
+  }
+
+  function finishTest() {
+    state = 'done';
+    setAreaClass(null);
+    setAreaText('Done! ✅');
+    startBtn.disabled = false;
+    startBtn.textContent = 'Start Again';
+    status.textContent = 'Results are ready. Copy the CSV below and paste into Google Sheets/Excel.';
+    renderResults();
+  }
+
+  function handleTap() {
+    if (state === 'idle') return;
+
+    if (state === 'waiting') {
+      // tapped too early
+      clearTimeout(timer);
+      state = 'tooSoon';
+      setAreaClass('red');
+      setAreaText('Too soon! 😬 Tap Start to try again.');
+      status.textContent = 'You tapped before it turned green. Restart the test.';
+      startBtn.disabled = false;
+      startBtn.textContent = 'Start';
+      return;
+    }
+
+    if (state === 'go') {
+      const rt = Math.round(nowMs() - goTime);
+      samples.push({ ms: rt, when: Date.now() });
+      trial++;
+
+      clearTimeout(timer);
+      setAreaClass(null);
+      setAreaText(`Nice! ${rt} ms`);
+      status.textContent = `Recorded: ${rt} ms`;
+
+      if (trial >= totalTrials) {
+        setTimeout(finishTest, 400);
+      } else {
+        setTimeout(startTrial, 650);
+      }
+    }
+  }
+
+  startBtn.addEventListener('click', startTest);
+  resetBtn.addEventListener('click', resetAll);
+
+  // Tap area
+  area.addEventListener('click', handleTap);
+  area.addEventListener('touchstart', (e) => { e.preventDefault(); handleTap(); }, { passive: false });
+
+  // Copy CSV
+  copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(exportBox.value);
+      copyBtn.textContent = 'Copied!';
+      setTimeout(()=> copyBtn.textContent = 'Copy', 900);
+    } catch {
+      exportBox.select();
+      document.execCommand('copy');
+    }
+  });
+
+  resetAll();
+})();
+</script>
+</body>
+</html>
